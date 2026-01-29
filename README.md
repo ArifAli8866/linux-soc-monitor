@@ -3,16 +3,9 @@
 # 🛡️ CyberSecMon — Personal Linux Security Monitoring Tool
 
 <p align="center">
-  <code>
-    <span style="color:#00ff00; font-family:monospace; font-size:24px;">  ____ _   _ ____  ____ ____ ___ ____  __  __ ___ _   _ </span><br>
-    <span style="color:#00ffff; font-family:monospace; font-size:24px;"> / ___| | | / ___||  _ \ ___|_ _|  _ \|  \/  |_ _| \ | |</span><br>
-    <span style="color:#ff00ff; font-family:monospace; font-size:24px;">| |   | | | \___ \| | | |__  | || | | | |\/| || ||  \| |</span><br>
-    <span style="color:#ffff00; font-family:monospace; font-size:24px;">| |___| |_| |___) | |_| |___| | || |_| | |  | || || |\  |</span><br>
-    <span style="color:#ff6600; font-family:monospace; font-size:24px;"> \____|\___/|____/|____/    |___|____/|_|  |_|___|_| \_|</span><br>
-  </code>
-  <br>
-  <span style="color:#00ff00; font-family:monospace; font-size:18px;">Linux Security Monitoring Tool</span>
+  <img src="https://img.shields.io/badge/CyberSecMon-Loading-%2300ff00?style=for-the-badge&logo=terminal&logoColor=black&labelColor=000000" alt="CyberSecMon Loading">
 </p>
+
 
 
 <p align="center">
