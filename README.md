@@ -3,8 +3,17 @@
 # 🛡️ CyberSecMon — Personal Linux Security Monitoring Tool
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/ArifAli8866/CyberSecMon/main/assets/cybersecmon-overview.png" alt="CyberSecMon" width="450">
+  <code>
+    <span style="color:#00ff00; font-family:monospace; font-size:24px;">  ____ _   _ ____  ____ ____ ___ ____  __  __ ___ _   _ </span><br>
+    <span style="color:#00ffff; font-family:monospace; font-size:24px;"> / ___| | | / ___||  _ \ ___|_ _|  _ \|  \/  |_ _| \ | |</span><br>
+    <span style="color:#ff00ff; font-family:monospace; font-size:24px;">| |   | | | \___ \| | | |__  | || | | | |\/| || ||  \| |</span><br>
+    <span style="color:#ffff00; font-family:monospace; font-size:24px;">| |___| |_| |___) | |_| |___| | || |_| | |  | || || |\  |</span><br>
+    <span style="color:#ff6600; font-family:monospace; font-size:24px;"> \____|\___/|____/|____/    |___|____/|_|  |_|___|_| \_|</span><br>
+  </code>
+  <br>
+  <span style="color:#00ff00; font-family:monospace; font-size:18px;">Linux Security Monitoring Tool</span>
 </p>
+
 
 <p align="center">
   <strong>Automated, Safe, and Professional Cybersecurity Monitoring for Linux</strong>
