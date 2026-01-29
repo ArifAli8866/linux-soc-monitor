@@ -88,7 +88,7 @@ sudo ./cybersecmon.sh
 <p align="center">
   <img src="Blue and White Gradient 3D We Are Hiring LinkedIn Post (1).png" alt="Feature 1" width="300">
   <img src="Screenshot_2026-01-29_22-55-29.png" alt="Feature 2" width="300">
-  <img src="hcreenshot_2026-01-29_22-56-01.png" alt="Feature 3" width="300">
+  <img src="Screenshot_2026-01-29_22-56-01.png" alt="Feature 3" width="300">
 </p>
 
 *(Replace with your own screenshots or live dashboard captures)*
