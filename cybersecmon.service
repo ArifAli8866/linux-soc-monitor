@@ -1,0 +1,16 @@
+[Unit]
+Description=CyberSec Linux Health & Threat Monitor Daemon
+After=network.target network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/cybersecmon --daemon 60 --no-install
+Restart=on-failure
+RestartSec=30s
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=cybersecmon
+
+[Install]
+WantedBy=multi-user.target
