@@ -3,8 +3,11 @@
 # ==========================================================
 #  CyberSec Linux Health & Threat Monitor
 #  Author  : Arif Ali
-#  Version : 4.0 (Auto-Install + User Config)
+#  Version : 4.2.0 (CLI + Auto-Install + User Config)
 # ==========================================================
+
+VERSION="4.2.0"
+
 
 # ---------------- COLORS ----------------
 RED="\e[31m"; GREEN="\e[32m"; YELLOW="\e[33m"
@@ -436,32 +439,195 @@ echo "12) Exit"
 echo -e "${RESET}"
 }
 
-# ---------------- MAIN ----------------
-auto_install
-init_config
-loading
-
-while true; do
-  banner
-  menu
-  read -p "Choose option [1-12]: " ch
-
-  case $ch in
-    1) cpu_check ;;
-    2) memory_check ;;
-    3) disk_check ;;
-    4) internet_check ;;
-    5) login_monitor ;;
-    6) top_processes ;;
-    7) network_ports_check ;;
-    8) user_audit ;;
-    9) system_integrity_check ;;
-    10) full_scan ;;
-    11) configure_settings ;;
-    12) echo -e "${RED}Exiting CyberSec Monitor...${RESET}"; exit 0 ;;
-    *) echo -e "${RED}Invalid option${RESET}" ;;
-  esac
-
+# ---------------- HELP & USAGE ----------------
+show_help() {
+  echo -e "${CYAN}${BOLD}CyberSec Linux Health & Threat Monitor v${VERSION}${RESET}"
+  echo "Usage: $0 [OPTIONS]"
   echo
-  read -p "Press Enter to continue..."
+  echo "Options:"
+  echo "  -s, --scan              Run full security scan non-interactively and exit"
+  echo "  -j, --json              Output metrics in JSON format for SIEM/SOC ingestion"
+  echo "  -d, --daemon [SEC]      Run continuously in daemon mode (default: 60s)"
+  echo "  -c, --config [FILE]     Specify custom configuration file path"
+  echo "      --no-install        Skip automatic package dependency check"
+  echo "  -v, --version           Show version information"
+  echo "  -h, --help              Show this help message"
+  echo
+}
+
+# ---------------- JSON TELEMETRY ----------------
+output_json() {
+  refresh_timestamps
+  local cpu_idle
+  cpu_idle=$(LC_ALL=C top -bn1 | awk -F',' '/Cpu\(s\)/ {for(i=1;i<=NF;i++) if($i ~ /id/) {gsub(/[^0-9.]/,"",$i); print $i; exit}}')
+  if [ -z "$cpu_idle" ]; then
+    cpu_idle=$(LC_ALL=C top -bn1 | grep "Cpu(s)" | awk '{print $8}')
+  fi
+  local cpu_usage
+  cpu_usage=$(awk "BEGIN {printf \"%.1f\", 100 - ${cpu_idle:-0}}")
+
+  local mem_usage
+  mem_usage=$(free | awk '/Mem:/ {if ($2 > 0) printf("%.0f", ($3/$2) * 100); else print 0}')
+
+  local disk_usage
+  disk_usage=$(df -P / | tail -1 | awk '{print $5}' | tr -d '%')
+
+  local internet_status="disconnected"
+  if ping -c 1 -W 2 1.1.1.1 &>/dev/null || ping -c 1 -W 2 google.com &>/dev/null; then
+    internet_status="connected"
+  fi
+
+  local failed_logins=0
+  if [ -r "/var/log/auth.log" ]; then
+    failed_logins=$(grep -E -i "(failed password|authentication failure)" /var/log/auth.log 2>/dev/null | wc -l)
+  elif command -v journalctl &>/dev/null; then
+    failed_logins=$(journalctl -u ssh -u sshd --since "24 hours ago" 2>/dev/null | grep -E -i "(failed password|authentication failure)" | wc -l)
+  fi
+
+  local listening_ports_count=0
+  if command -v ss &>/dev/null; then
+    listening_ports_count=$(ss -tuln | awk 'NR>1 {print $1, $5}' | grep -c -v '^$' || true)
+  fi
+
+  local failed_units=0
+  if command -v systemctl &>/dev/null; then
+    failed_units=$(systemctl --failed --no-legend --no-pager 2>/dev/null | grep -c -v '^$' || true)
+  fi
+
+  cat <<EOF
+{
+  "timestamp": "$DATE $TIME",
+  "system": {
+    "hostname": "$(hostname 2>/dev/null || echo 'unknown')",
+    "kernel": "$(uname -r 2>/dev/null || echo 'unknown')"
+  },
+  "metrics": {
+    "cpu_percent": ${cpu_usage:-0},
+    "memory_percent": ${mem_usage:-0},
+    "disk_percent": ${disk_usage:-0},
+    "internet_status": "$internet_status",
+    "failed_logins": ${failed_logins:-0},
+    "listening_ports_count": ${listening_ports_count:-0},
+    "failed_systemd_units": ${failed_units:-0}
+  },
+  "thresholds": {
+    "cpu_limit": $CPU_LIMIT,
+    "memory_limit": $MEM_LIMIT,
+    "disk_limit": $DISK_LIMIT,
+    "login_fail_limit": $LOGIN_FAIL_LIMIT
+  }
+}
+EOF
+}
+
+# ---------------- DAEMON MODE ----------------
+run_daemon() {
+  local interval="${1:-60}"
+  echo -e "${GREEN}Starting CyberSec Monitor in daemon mode (Interval: ${interval}s)...${RESET}"
+  log_event "Daemon started with interval ${interval}s"
+  while true; do
+    full_scan
+    sleep "$interval"
+  done
+}
+
+# ---------------- MAIN ----------------
+SKIP_INSTALL=false
+MODE="interactive"
+DAEMON_INTERVAL=60
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -h|--help)
+      show_help
+      exit 0
+      ;;
+    -v|--version)
+      echo "CyberSec Monitor v$VERSION"
+      exit 0
+      ;;
+    -s|--scan)
+      MODE="scan"
+      shift
+      ;;
+    -j|--json)
+      MODE="json"
+      shift
+      ;;
+    -d|--daemon)
+      MODE="daemon"
+      if [[ -n "$2" && "$2" =~ ^[0-9]+$ ]]; then
+        DAEMON_INTERVAL="$2"
+        shift 2
+      else
+        shift
+      fi
+      ;;
+    -c|--config)
+      if [ -n "$2" ]; then
+        CONFIG_FILE="$2"
+        shift 2
+      else
+        echo "Error: --config requires a file path" >&2
+        exit 1
+      fi
+      ;;
+    --no-install)
+      SKIP_INSTALL=true
+      shift
+      ;;
+    *)
+      echo "Unknown option: $1" >&2
+      show_help
+      exit 1
+      ;;
+  esac
 done
+
+if [ "$SKIP_INSTALL" = false ]; then
+  auto_install
+fi
+
+init_config
+
+case "$MODE" in
+  scan)
+    full_scan
+    exit 0
+    ;;
+  json)
+    output_json
+    exit 0
+    ;;
+  daemon)
+    run_daemon "$DAEMON_INTERVAL"
+    exit 0
+    ;;
+  interactive)
+    loading
+    while true; do
+      banner
+      menu
+      read -p "Choose option [1-12]: " ch
+
+      case $ch in
+        1) cpu_check ;;
+        2) memory_check ;;
+        3) disk_check ;;
+        4) internet_check ;;
+        5) login_monitor ;;
+        6) top_processes ;;
+        7) network_ports_check ;;
+        8) user_audit ;;
+        9) system_integrity_check ;;
+        10) full_scan ;;
+        11) configure_settings ;;
+        12) echo -e "${RED}Exiting CyberSec Monitor...${RESET}"; exit 0 ;;
+        *) echo -e "${RED}Invalid option${RESET}" ;;
+      esac
+
+      echo
+      read -p "Press Enter to continue..."
+    done
+    ;;
+esac
