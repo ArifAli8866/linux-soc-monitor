@@ -19,7 +19,8 @@ DISK_LIMIT=85
 # ---------------- FILES ----------------
 REPORT_DIR="reports"
 LOG_FILE="security.log"
-CONFIG_FILE="$HOME/.cybersec_monitor.conf"
+CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/cybersec_monitor"
+CONFIG_FILE="$CONFIG_DIR/cybersec_monitor.conf"
 
 DATE=""
 TIME=""
@@ -59,21 +60,90 @@ echo -e "${RESET}\n"
 
 # ---------------- CONFIG ----------------
 init_config() {
-  if [ ! -f "$CONFIG_FILE" ]; then
-    echo "EMAIL_ALERT=" > "$CONFIG_FILE"
+  if [ -f "$HOME/.cybersec_monitor.conf" ] && [ ! -f "$CONFIG_FILE" ]; then
+    CONFIG_FILE="$HOME/.cybersec_monitor.conf"
+  else
+    mkdir -p "$(dirname "$CONFIG_FILE")"
   fi
+
+  if [ ! -f "$CONFIG_FILE" ]; then
+    cat <<EOF > "$CONFIG_FILE"
+# CyberSec Linux Health & Threat Monitor Config
+EMAIL_ALERT=""
+CPU_LIMIT=80
+MEM_LIMIT=80
+DISK_LIMIT=85
+LOGIN_FAIL_LIMIT=5
+REPORT_DIR="reports"
+LOG_FILE="security.log"
+EOF
+  fi
+
+  # shellcheck disable=SC1090
   source "$CONFIG_FILE"
+
+  # Ensure default values if unset in config
+  CPU_LIMIT=${CPU_LIMIT:-80}
+  MEM_LIMIT=${MEM_LIMIT:-80}
+  DISK_LIMIT=${DISK_LIMIT:-85}
+  LOGIN_FAIL_LIMIT=${LOGIN_FAIL_LIMIT:-5}
+  REPORT_DIR=${REPORT_DIR:-"reports"}
+  LOG_FILE=${LOG_FILE:-"security.log"}
+}
+
+save_config() {
+  mkdir -p "$(dirname "$CONFIG_FILE")"
+  cat <<EOF > "$CONFIG_FILE"
+# CyberSec Linux Health & Threat Monitor Config
+EMAIL_ALERT="$EMAIL_ALERT"
+CPU_LIMIT=$CPU_LIMIT
+MEM_LIMIT=$MEM_LIMIT
+DISK_LIMIT=$DISK_LIMIT
+LOGIN_FAIL_LIMIT=$LOGIN_FAIL_LIMIT
+REPORT_DIR="$REPORT_DIR"
+LOG_FILE="$LOG_FILE"
+EOF
+  echo -e "${GREEN}✔ Configuration saved to $CONFIG_FILE${RESET}"
+}
+
+# ---------------- SETTINGS ----------------
+configure_settings() {
+  echo -e "\n${CYAN}${BOLD}=== Monitor Configuration ===${RESET}"
+  echo "1. Alert Email        : ${EMAIL_ALERT:-[Not Set]}"
+  echo "2. CPU Alert Limit   : ${CPU_LIMIT}%"
+  echo "3. RAM Alert Limit   : ${MEM_LIMIT}%"
+  echo "4. Disk Alert Limit  : ${DISK_LIMIT}%"
+  echo "5. Login Fail Limit  : ${LOGIN_FAIL_LIMIT} attempts"
+  echo "----------------------------------------"
+
+  read -p "Enter Alert Email [current: ${EMAIL_ALERT:-none}]: " new_email
+  if [ -n "$new_email" ]; then EMAIL_ALERT="$new_email"; fi
+
+  read -p "Enter CPU Limit % [current: ${CPU_LIMIT}]: " new_cpu
+  if [[ "$new_cpu" =~ ^[0-9]+$ ]]; then CPU_LIMIT="$new_cpu"; fi
+
+  read -p "Enter Memory Limit % [current: ${MEM_LIMIT}]: " new_mem
+  if [[ "$new_mem" =~ ^[0-9]+$ ]]; then MEM_LIMIT="$new_mem"; fi
+
+  read -p "Enter Disk Limit % [current: ${DISK_LIMIT}]: " new_disk
+  if [[ "$new_disk" =~ ^[0-9]+$ ]]; then DISK_LIMIT="$new_disk"; fi
+
+  read -p "Enter Failed Login Limit [current: ${LOGIN_FAIL_LIMIT}]: " new_lgn
+  if [[ "$new_lgn" =~ ^[0-9]+$ ]]; then LOGIN_FAIL_LIMIT="$new_lgn"; fi
+
+  save_config
+  sleep 1
 }
 
 # ---------------- BANNER ----------------
 banner() {
-clear
-echo -e "${CYAN}${BOLD}"
-echo "╔════════════════════════════════════════════════════╗"
-echo "║   CYBERSEC LINUX HEALTH & THREAT MONITOR            ║"
-echo "║           Created by Arif Ali                       ║"
-echo "╚════════════════════════════════════════════════════╝"
-echo -e "${RESET}"
+  clear
+  echo -e "${CYAN}${BOLD}"
+  echo "╔════════════════════════════════════════════════════╗"
+  echo "║   CYBERSEC LINUX HEALTH & THREAT MONITOR            ║"
+  echo "║           Created by Arif Ali                       ║"
+  echo "╚════════════════════════════════════════════════════╝"
+  echo -e "${RESET}"
 }
 
 # ---------------- LOG ----------------
@@ -87,14 +157,6 @@ send_alert() {
     return
   fi
   echo "$1" | mail -s "⚠ CyberSec System Alert" "$EMAIL_ALERT"
-}
-
-# ---------------- SET EMAIL ----------------
-set_email() {
-  read -p "Enter your email for alerts (leave empty to disable): " email
-  sed -i "s/^EMAIL_ALERT=.*/EMAIL_ALERT=$email/" "$CONFIG_FILE"
-  echo -e "${GREEN}✔ Email configuration saved${RESET}"
-  sleep 1
 }
 
 # ---------------- CPU ----------------
@@ -182,8 +244,8 @@ login_monitor() {
   echo -e "${MAGENTA}Failed Login Attempts: ${failed}${RESET}"
   echo "Failed Logins: ${failed}" >> "$REPORT_FILE"
 
-  if [ "${failed:-0}" -gt 5 ]; then
-    echo -e "${RED}⚠ Possible brute-force attack! (${failed} failed attempts)${RESET}"
+  if [ "${failed:-0}" -gt "$LOGIN_FAIL_LIMIT" ]; then
+    echo -e "${RED}⚠ Possible brute-force attack! (${failed} failed attempts > ${LOGIN_FAIL_LIMIT})${RESET}"
     log_event "Suspicious login activity: ${failed} failed attempts"
     send_alert "Suspicious login activity detected (${failed} failed attempts)"
   fi
@@ -222,7 +284,7 @@ echo "4) Internet Status"
 echo "5) Login Attack Scan"
 echo "6) Top Processes"
 echo "7) Full Security Scan"
-echo "8) Configure Email Alerts"
+echo "8) Configure Settings & Thresholds"
 echo "9) Exit"
 echo -e "${RESET}"
 }
@@ -245,7 +307,7 @@ while true; do
     5) login_monitor ;;
     6) top_processes ;;
     7) full_scan ;;
-    8) set_email ;;
+    8) configure_settings ;;
     9) echo -e "${RED}Exiting CyberSec Monitor...${RESET}"; exit 0 ;;
     *) echo -e "${RED}Invalid option${RESET}" ;;
   esac
