@@ -341,6 +341,65 @@ user_audit() {
   echo "Interactive shell users: ${shell_accounts}" >> "$REPORT_FILE"
 }
 
+# ---------------- SYSTEM INTEGRITY & SERVICES ----------------
+system_integrity_check() {
+  refresh_timestamps
+  echo -e "${YELLOW}--- System Integrity & Service Status ---${RESET}"
+  echo "===== SYSTEM INTEGRITY ($DATE $TIME) =====" >> "$REPORT_FILE"
+
+  if command -v systemctl &>/dev/null; then
+    local failed_services
+    failed_services=$(systemctl --failed --no-legend --no-pager 2>/dev/null)
+    local failed_count=0
+    if [ -n "$failed_services" ]; then
+      failed_count=$(echo "$failed_services" | grep -c -v '^$' || true)
+    fi
+
+    if [ "${failed_count:-0}" -gt 0 ]; then
+      echo -e "${RED}⚠ Found ${failed_count} failed systemd service(s):${RESET}"
+      echo "$failed_services" | head -n 10
+      echo "$failed_services" >> "$REPORT_FILE"
+      log_event "Warning: ${failed_count} systemd unit(s) in failed state"
+      send_alert "Warning: ${failed_count} failed systemd services detected on system!"
+    else
+      echo -e "${GREEN}✔ All system services active without failures.${RESET}"
+      echo "Systemd Services: All healthy" >> "$REPORT_FILE"
+    fi
+  fi
+
+  echo -e "\n${WHITE}Firewall Status:${RESET}"
+  if command -v ufw &>/dev/null; then
+    local ufw_stat
+    ufw_stat=$(ufw status 2>/dev/null || true)
+    if [ -n "$ufw_stat" ]; then
+      echo "$ufw_stat" | head -n 4
+      echo "UFW Status: $ufw_stat" >> "$REPORT_FILE"
+    else
+      echo -e "${YELLOW}UFW installed (requires sudo to read status)${RESET}"
+    fi
+  elif command -v iptables &>/dev/null; then
+    echo "iptables installed"
+  else
+    echo -e "${YELLOW}No standard firewall detected (ufw/iptables)${RESET}"
+  fi
+
+  echo -e "\n${WHITE}Scheduled Tasks (Cron) Audit:${RESET}"
+  local user_cron
+  user_cron=$(crontab -l 2>/dev/null | grep -v '^#' | grep -v '^$' || true)
+  if [ -n "$user_cron" ]; then
+    echo -e "${CYAN}Current User Crontab Entries:${RESET}"
+    echo "$user_cron"
+    echo "User Crontab: $user_cron" >> "$REPORT_FILE"
+  else
+    echo "No custom user cron jobs active."
+  fi
+
+  local sys_cron_count
+  sys_cron_count=$(ls -1 /etc/cron* 2>/dev/null | wc -l)
+  echo "System Cron Definitions: ${sys_cron_count} items found in /etc/cron*"
+  echo "System Cron Entries Count: ${sys_cron_count}" >> "$REPORT_FILE"
+}
+
 # ---------------- FULL SCAN ----------------
 full_scan() {
   refresh_timestamps
@@ -353,6 +412,7 @@ full_scan() {
   top_processes
   network_ports_check
   user_audit
+  system_integrity_check
 
   echo -e "\n${GREEN}${BOLD}✔ Full security scan completed${RESET}"
   echo -e "${CYAN}Report saved: $REPORT_FILE${RESET}"
@@ -369,9 +429,10 @@ echo "5)  Login Attack Scan"
 echo "6)  Top Processes"
 echo "7)  Open Ports & Sockets Audit"
 echo "8)  User Accounts & Sessions Audit"
-echo "9)  Full Security Scan"
-echo "10) Configure Settings & Thresholds"
-echo "11) Exit"
+echo "9)  System Integrity & Services Audit"
+echo "10) Full Security Scan"
+echo "11) Configure Settings & Thresholds"
+echo "12) Exit"
 echo -e "${RESET}"
 }
 
@@ -383,7 +444,7 @@ loading
 while true; do
   banner
   menu
-  read -p "Choose option [1-11]: " ch
+  read -p "Choose option [1-12]: " ch
 
   case $ch in
     1) cpu_check ;;
@@ -394,9 +455,10 @@ while true; do
     6) top_processes ;;
     7) network_ports_check ;;
     8) user_audit ;;
-    9) full_scan ;;
-    10) configure_settings ;;
-    11) echo -e "${RED}Exiting CyberSec Monitor...${RESET}"; exit 0 ;;
+    9) system_integrity_check ;;
+    10) full_scan ;;
+    11) configure_settings ;;
+    12) echo -e "${RED}Exiting CyberSec Monitor...${RESET}"; exit 0 ;;
     *) echo -e "${RED}Invalid option${RESET}" ;;
   esac
 
