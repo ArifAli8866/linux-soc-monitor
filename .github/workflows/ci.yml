@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y mailutils iproute2 procps iputils-ping gawk
+
+      - name: Validate Bash syntax
+        run: |
+          bash -n health_monitor.sh
+          bash -n install.sh
+          bash -n uninstall.sh
+          bash -n tests/test_monitor.sh
+
+      - name: Run Test Suite
+        run: |
+          chmod +x tests/test_monitor.sh health_monitor.sh install.sh uninstall.sh
+          ./tests/test_monitor.sh
