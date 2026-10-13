@@ -302,6 +302,45 @@ network_ports_check() {
   fi
 }
 
+# ---------------- USER ACCOUNT & SESSION AUDIT ----------------
+user_audit() {
+  refresh_timestamps
+  echo -e "${MAGENTA}--- User Accounts & Active Sessions Audit ---${RESET}"
+  echo "===== USER AUDIT ($DATE $TIME) =====" >> "$REPORT_FILE"
+
+  echo -e "${WHITE}Currently Logged In Users:${RESET}"
+  local logged_users
+  logged_users=$(who 2>/dev/null)
+  if [ -n "$logged_users" ]; then
+    echo "$logged_users"
+    echo "$logged_users" >> "$REPORT_FILE"
+  else
+    echo "No interactive user sessions detected."
+    echo "No interactive user sessions." >> "$REPORT_FILE"
+  fi
+
+  local uid_zero_users
+  uid_zero_users=$(awk -F: '($3 == 0) {print $1}' /etc/passwd 2>/dev/null)
+  local uid_zero_count
+  uid_zero_count=$(echo "$uid_zero_users" | wc -w)
+
+  echo -e "\n${WHITE}Accounts with UID 0 (Superuser):${RESET} $uid_zero_users"
+  echo "UID 0 Accounts: $uid_zero_users" >> "$REPORT_FILE"
+
+  if [ "${uid_zero_count:-0}" -gt 1 ]; then
+    echo -e "${RED}⚠ CRITICAL ALERT: Multiple accounts have UID 0 root privilege! ($uid_zero_users)${RESET}"
+    log_event "CRITICAL: Multiple UID 0 accounts detected: $uid_zero_users"
+    send_alert "CRITICAL: Multiple UID 0 superuser accounts detected on system!"
+  else
+    echo -e "${GREEN}✔ Root account configuration normal.${RESET}"
+  fi
+
+  local shell_accounts
+  shell_accounts=$(grep -E "(/bash|/sh|/zsh)$" /etc/passwd 2>/dev/null | awk -F: '{print $1}' | paste -sd, -)
+  echo -e "${CYAN}Accounts with interactive shell:${RESET} ${shell_accounts}"
+  echo "Interactive shell users: ${shell_accounts}" >> "$REPORT_FILE"
+}
+
 # ---------------- FULL SCAN ----------------
 full_scan() {
   refresh_timestamps
@@ -313,6 +352,7 @@ full_scan() {
   login_monitor
   top_processes
   network_ports_check
+  user_audit
 
   echo -e "\n${GREEN}${BOLD}✔ Full security scan completed${RESET}"
   echo -e "${CYAN}Report saved: $REPORT_FILE${RESET}"
@@ -328,9 +368,10 @@ echo "4)  Internet Status"
 echo "5)  Login Attack Scan"
 echo "6)  Top Processes"
 echo "7)  Open Ports & Sockets Audit"
-echo "8)  Full Security Scan"
-echo "9)  Configure Settings & Thresholds"
-echo "10) Exit"
+echo "8)  User Accounts & Sessions Audit"
+echo "9)  Full Security Scan"
+echo "10) Configure Settings & Thresholds"
+echo "11) Exit"
 echo -e "${RESET}"
 }
 
@@ -342,7 +383,7 @@ loading
 while true; do
   banner
   menu
-  read -p "Choose option [1-10]: " ch
+  read -p "Choose option [1-11]: " ch
 
   case $ch in
     1) cpu_check ;;
@@ -352,9 +393,10 @@ while true; do
     5) login_monitor ;;
     6) top_processes ;;
     7) network_ports_check ;;
-    8) full_scan ;;
-    9) configure_settings ;;
-    10) echo -e "${RED}Exiting CyberSec Monitor...${RESET}"; exit 0 ;;
+    8) user_audit ;;
+    9) full_scan ;;
+    10) configure_settings ;;
+    11) echo -e "${RED}Exiting CyberSec Monitor...${RESET}"; exit 0 ;;
     *) echo -e "${RED}Invalid option${RESET}" ;;
   esac
 
