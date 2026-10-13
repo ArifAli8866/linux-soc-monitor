@@ -21,11 +21,16 @@ REPORT_DIR="reports"
 LOG_FILE="security.log"
 CONFIG_FILE="$HOME/.cybersec_monitor.conf"
 
-mkdir -p $REPORT_DIR
+DATE=""
+TIME=""
+REPORT_FILE=""
 
-DATE=$(date +"%Y-%m-%d")
-TIME=$(date +"%H:%M:%S")
-REPORT_FILE="$REPORT_DIR/report_$DATE.txt"
+refresh_timestamps() {
+  DATE=$(date +"%Y-%m-%d")
+  TIME=$(date +"%H:%M:%S")
+  mkdir -p "$REPORT_DIR"
+  REPORT_FILE="$REPORT_DIR/report_$DATE.txt"
+}
 
 # ---------------- AUTO INSTALL ----------------
 auto_install() {
@@ -73,107 +78,138 @@ echo -e "${RESET}"
 
 # ---------------- LOG ----------------
 log_event() {
-echo "[$(date)] $1" >> $LOG_FILE
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" >> "$LOG_FILE"
 }
 
 # ---------------- EMAIL ALERT ----------------
 send_alert() {
-if [ -z "$EMAIL_ALERT" ]; then
-  return
-fi
-echo "$1" | mail -s "⚠ CyberSec System Alert" "$EMAIL_ALERT"
+  if [ -z "$EMAIL_ALERT" ]; then
+    return
+  fi
+  echo "$1" | mail -s "⚠ CyberSec System Alert" "$EMAIL_ALERT"
 }
 
 # ---------------- SET EMAIL ----------------
 set_email() {
-read -p "Enter your email for alerts (leave empty to disable): " email
-sed -i "s/^EMAIL_ALERT=.*/EMAIL_ALERT=$email/" "$CONFIG_FILE"
-echo -e "${GREEN}✔ Email configuration saved${RESET}"
-sleep 1
+  read -p "Enter your email for alerts (leave empty to disable): " email
+  sed -i "s/^EMAIL_ALERT=.*/EMAIL_ALERT=$email/" "$CONFIG_FILE"
+  echo -e "${GREEN}✔ Email configuration saved${RESET}"
+  sleep 1
 }
 
 # ---------------- CPU ----------------
 cpu_check() {
-CPU=$(top -bn1 | grep "Cpu(s)" | awk '{print 100-$8}')
-echo -e "${GREEN}CPU Usage: $CPU%${RESET}"
-echo "CPU: $CPU%" >> $REPORT_FILE
+  refresh_timestamps
+  local cpu_idle
+  cpu_idle=$(LC_ALL=C top -bn1 | awk -F',' '/Cpu\(s\)/ {for(i=1;i<=NF;i++) if($i ~ /id/) {gsub(/[^0-9.]/,"",$i); print $i; exit}}')
+  if [ -z "$cpu_idle" ]; then
+    cpu_idle=$(LC_ALL=C top -bn1 | grep "Cpu(s)" | awk '{print $8}')
+  fi
+  local cpu_usage
+  cpu_usage=$(awk "BEGIN {printf \"%.1f\", 100 - ${cpu_idle:-0}}")
+  local cpu_int=${cpu_usage%.*}
 
-if (( ${CPU%.*} > CPU_LIMIT )); then
-  echo -e "${RED}⚠ CPU threshold exceeded!${RESET}"
-  log_event "High CPU usage"
-  send_alert "High CPU usage detected: $CPU%"
-fi
+  echo -e "${GREEN}CPU Usage: ${cpu_usage}%${RESET}"
+  echo "CPU: ${cpu_usage}%" >> "$REPORT_FILE"
+
+  if [ "${cpu_int:-0}" -gt "$CPU_LIMIT" ]; then
+    echo -e "${RED}⚠ CPU threshold exceeded (${cpu_usage}% > ${CPU_LIMIT}%)!${RESET}"
+    log_event "High CPU usage: ${cpu_usage}%"
+    send_alert "High CPU usage detected: ${cpu_usage}% (Threshold: ${CPU_LIMIT}%)"
+  fi
 }
 
 # ---------------- MEMORY ----------------
 memory_check() {
-MEM=$(free | awk '/Mem/ {printf("%.0f"), $3/$2 * 100}')
-echo -e "${BLUE}Memory Usage: $MEM%${RESET}"
-echo "Memory: $MEM%" >> $REPORT_FILE
+  refresh_timestamps
+  local mem_usage
+  mem_usage=$(free | awk '/Mem:/ {if ($2 > 0) printf("%.0f", ($3/$2) * 100); else print 0}')
+  echo -e "${BLUE}Memory Usage: ${mem_usage}%${RESET}"
+  echo "Memory: ${mem_usage}%" >> "$REPORT_FILE"
 
-if (( MEM > MEM_LIMIT )); then
-  echo -e "${RED}⚠ Memory threshold exceeded!${RESET}"
-  log_event "High memory usage"
-  send_alert "High memory usage detected: $MEM%"
-fi
+  if [ "${mem_usage:-0}" -gt "$MEM_LIMIT" ]; then
+    echo -e "${RED}⚠ Memory threshold exceeded (${mem_usage}% > ${MEM_LIMIT}%)!${RESET}"
+    log_event "High memory usage: ${mem_usage}%"
+    send_alert "High memory usage detected: ${mem_usage}% (Threshold: ${MEM_LIMIT}%)"
+  fi
 }
 
 # ---------------- DISK ----------------
 disk_check() {
-DISK=$(df / | tail -1 | awk '{print $5}' | sed 's/%//')
-echo -e "${YELLOW}Disk Usage: $DISK%${RESET}"
-echo "Disk: $DISK%" >> $REPORT_FILE
+  refresh_timestamps
+  local disk_usage
+  disk_usage=$(df -P / | tail -1 | awk '{print $5}' | tr -d '%')
+  echo -e "${YELLOW}Disk Usage: ${disk_usage}%${RESET}"
+  echo "Disk: ${disk_usage}%" >> "$REPORT_FILE"
 
-if (( DISK > DISK_LIMIT )); then
-  echo -e "${RED}⚠ Disk threshold exceeded!${RESET}"
-  log_event "Disk usage critical"
-  send_alert "Disk usage critical: $DISK%"
-fi
+  if [ "${disk_usage:-0}" -gt "$DISK_LIMIT" ]; then
+    echo -e "${RED}⚠ Disk threshold exceeded (${disk_usage}% > ${DISK_LIMIT}%)!${RESET}"
+    log_event "Disk usage critical: ${disk_usage}%"
+    send_alert "Disk usage critical: ${disk_usage}% (Threshold: ${DISK_LIMIT}%)"
+  fi
 }
 
 # ---------------- INTERNET ----------------
 internet_check() {
-ping -c 1 google.com &>/dev/null
-if [ $? -eq 0 ]; then
-  echo -e "${GREEN}Internet: Connected${RESET}"
-else
-  echo -e "${RED}Internet: Disconnected${RESET}"
-  log_event "Internet disconnected"
-fi
+  if ping -c 1 -W 2 1.1.1.1 &>/dev/null || ping -c 1 -W 2 google.com &>/dev/null; then
+    echo -e "${GREEN}Internet: Connected${RESET}"
+  else
+    echo -e "${RED}Internet: Disconnected${RESET}"
+    log_event "Internet disconnected"
+  fi
 }
 
 # ---------------- LOGIN ATTACK CHECK ----------------
 login_monitor() {
-FAILED=$(grep "Failed password" /var/log/auth.log 2>/dev/null | wc -l)
-echo -e "${MAGENTA}Failed Login Attempts: $FAILED${RESET}"
-echo "Failed Logins: $FAILED" >> $REPORT_FILE
+  refresh_timestamps
+  local failed=0
+  local auth_log=""
 
-if (( FAILED > 5 )); then
-  echo -e "${RED}⚠ Possible brute-force attack!${RESET}"
-  log_event "Suspicious login activity"
-  send_alert "Suspicious login activity detected ($FAILED failed attempts)"
-fi
+  if [ -r "/var/log/auth.log" ]; then
+    auth_log="/var/log/auth.log"
+  elif [ -r "/var/log/secure" ]; then
+    auth_log="/var/log/secure"
+  fi
+
+  if [ -n "$auth_log" ]; then
+    failed=$(grep -E -i "(failed password|authentication failure)" "$auth_log" 2>/dev/null | wc -l)
+  elif command -v journalctl &>/dev/null; then
+    failed=$(journalctl -u ssh -u sshd --since "24 hours ago" 2>/dev/null | grep -E -i "(failed password|authentication failure)" | wc -l)
+  else
+    echo -e "${YELLOW}Notice: Auth logs require elevated privileges (run with sudo)${RESET}"
+  fi
+
+  echo -e "${MAGENTA}Failed Login Attempts: ${failed}${RESET}"
+  echo "Failed Logins: ${failed}" >> "$REPORT_FILE"
+
+  if [ "${failed:-0}" -gt 5 ]; then
+    echo -e "${RED}⚠ Possible brute-force attack! (${failed} failed attempts)${RESET}"
+    log_event "Suspicious login activity: ${failed} failed attempts"
+    send_alert "Suspicious login activity detected (${failed} failed attempts)"
+  fi
 }
 
 # ---------------- PROCESSES ----------------
 top_processes() {
-echo -e "${WHITE}Top CPU Processes:${RESET}"
-ps -eo pid,comm,%cpu --sort=-%cpu | head -6
-ps -eo pid,comm,%cpu --sort=-%cpu | head -6 >> $REPORT_FILE
+  refresh_timestamps
+  echo -e "${WHITE}Top CPU Processes:${RESET}"
+  ps -eo pid,comm,%cpu --sort=-%cpu | head -6
+  ps -eo pid,comm,%cpu --sort=-%cpu | head -6 >> "$REPORT_FILE"
 }
 
 # ---------------- FULL SCAN ----------------
 full_scan() {
-echo "===== SECURITY REPORT ($DATE $TIME) =====" >> $REPORT_FILE
-cpu_check
-memory_check
-disk_check
-internet_check
-login_monitor
-top_processes
+  refresh_timestamps
+  echo "===== SECURITY REPORT ($DATE $TIME) =====" >> "$REPORT_FILE"
+  cpu_check
+  memory_check
+  disk_check
+  internet_check
+  login_monitor
+  top_processes
 
-echo -e "\n${GREEN}${BOLD}✔ Full security scan completed${RESET}"
-echo -e "${CYAN}Report saved: $REPORT_FILE${RESET}"
+  echo -e "\n${GREEN}${BOLD}✔ Full security scan completed${RESET}"
+  echo -e "${CYAN}Report saved: $REPORT_FILE${RESET}"
 }
 
 # ---------------- MENU ----------------
