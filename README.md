@@ -1,128 +1,267 @@
----
-
-# 🛡️ CyberSecMon — Personal Linux Security Monitoring Tool
+# 🛡️ CyberSec Linux SOC & Health Monitor (`CyberSecMon`)
 
 <p align="center">
-  <img src="https://img.shields.io/badge/CyberSecMon-Loading-%2300ff00?style=for-the-badge&logo=terminal&logoColor=black&labelColor=000000" alt="CyberSecMon Loading">
-</p>
-
-
-
-<p align="center">
-  <strong>Automated, Safe, and Professional Cybersecurity Monitoring for Linux</strong>
+  <img src="https://img.shields.io/badge/CyberSecMon-v4.2.0-%2300ff00?style=for-the-badge&logo=terminal&logoColor=black&labelColor=000000" alt="CyberSecMon Version">
+  <a href="https://github.com/ArifAli8866/linux-soc-monitor/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/ArifAli8866/linux-soc-monitor/ci.yml?branch=main&style=for-the-badge&logo=github-actions" alt="CI Status"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/ArifAli8866/linux-soc-monitor?style=for-the-badge" alt="MIT License"></a>
+  <img src="https://img.shields.io/badge/Shell-Bash-4EAA25?style=for-the-badge&logo=gnu-bash&logoColor=white" alt="Bash">
+  <a href="https://linkedin.com/in/arif-ali-23a38032a"><img src="https://img.shields.io/badge/LinkedIn-Arif%20Ali-blue?style=for-the-badge&logo=linkedin&logoColor=white" alt="LinkedIn"></a>
 </p>
 
 <p align="center">
-  <a href="https://github.com/ArifAli8866/CyberSecMon/actions/workflows/ci.yml?branch=main"><img src="https://img.shields.io/github/actions/workflow/status/ArifAli8866/CyberSecMon/ci.yml?branch=main&style=for-the-badge" alt="CI status"></a>
-  <a href="https://github.com/ArifAli8866/CyberSecMon/releases"><img src="https://img.shields.io/github/v/release/ArifAli8866/CyberSecMon?include_prereleases&style=for-the-badge" alt="GitHub release"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/github/license/ArifAli8866/CyberSecMon?style=for-the-badge" alt="MIT License"></a>
-  <a href="https://linkedin.com/in/arif-ali-23a38032a"><img src="https://img.shields.io/badge/Follow-on-LinkedIn-blue?style=for-the-badge&logo=linkedin&logoColor=white" alt="LinkedIn"></a>
+  <strong>Lightweight, Modular Linux Security Operations Center (SOC) & Host Health Monitoring Suite</strong>
 </p>
 
-**CyberSecMon** is a *menu-driven Linux cybersecurity monitoring tool* designed for both beginners and professionals.
-It provides threshold monitoring, animated dashboards, email alerts, and full system status tracking — all safe to host publicly on GitHub.
+---
+
+## 📌 Overview
+
+**CyberSecMon** (CyberSec Linux Health & Threat Monitor) is an enterprise-grade yet lightweight Linux security monitoring tool. Built entirely in native Bash without heavy runtime dependencies, it bridges the gap between terminal dashboards and automated SOC pipelines.
+
+Whether run interactively as a menu-driven TUI, automated through `cron` or `systemd`, or integrated into modern SIEM platforms via structured JSON telemetry, **CyberSecMon** delivers immediate threat visibility and resource governance.
 
 ---
 
-## Features
+## ✨ Features
 
-* ✅ **Automatic tools setup** (mail, acpi, etc.)
-* ✅ **No hard-coded emails** — configure per user
-* ✅ **Real-time cybersecurity-style monitoring**
-* ✅ **Animated loading screens for status updates**
-* ✅ **Threshold alerts for CPU, RAM, disk, and network usage**
-* ✅ **Automated email alerts when thresholds exceeded**
-* ✅ **Menu-driven, easy-to-use interface**
-* ✅ **Safe to share on public GitHub repo**
-* ✅ **Author credit clearly displayed**
+- 📊 **Resource & Health Governance**: Live metrics for CPU, RAM, and disk utilization with configurable alert thresholds.
+- 🚨 **Brute-Force Detection**: Monitors `/var/log/auth.log`, `/var/log/secure`, and `journalctl` for failed authentication attacks.
+- 🌐 **Attack Surface & Open Ports Audit**: Audits listening TCP/UDP sockets (`ss`/`netstat`) and raises critical alerts for sensitive database ports (Redis, MySQL, Postgres, Mongo) exposed on `0.0.0.0`.
+- 👤 **Identity & Privilege Auditing**: Tracks active terminal sessions, scans `/etc/passwd` for unauthorized UID 0 superuser accounts, and audits interactive shell accounts.
+- ⚙️ **System Integrity & Services**: Detects failed systemd service units, audits firewall status (UFW / iptables), and scans `/etc/cron*` for unauthorized scheduled task persistence.
+- 📡 **SIEM-Ready JSON Telemetry**: Export complete system state as machine-readable JSON via `--json` for ingestion into Splunk, Elastic, or Wazuh.
+- 🔄 **Daemon & Headless Modes**: Non-interactive continuous monitoring with customizable scan intervals (`--daemon`).
+- 📧 **Automated Email Notifications**: Dispatches alerts when critical thresholds or security events occur.
+- 🛠️ **Multi-Distro Installer**: Automated setup for Ubuntu, Debian, Fedora, CentOS/RHEL, Arch Linux, and openSUSE.
 
 ---
 
-## Installation (Recommended)
+## 📐 Architecture & Workflow
 
-**Linux (Ubuntu/Debian/Fedora compatible):**
+```
+┌────────────────────────────────────────────────────────┐
+│      CyberSec Linux Health & Threat Monitor (CLI/TUI)  │
+└───────────────────────────┬────────────────────────────┘
+                            │
+       ┌────────────────────┼────────────────────┐
+       ▼                    ▼                    ▼
+┌──────────────┐     ┌──────────────┐     ┌──────────────┐
+│ Host Health  │     │ Threat Intel │     │  Integrity   │
+├──────────────┤     ├──────────────┤     ├──────────────┤
+│ • CPU Usage  │     │ • Brute-Force│     │ • Failed Svcs│
+│ • RAM Usage  │     │ • Open Ports │     │ • UID 0 Root │
+│ • Disk Usage │     │ • Exposed DBs│     │ • Cron Tasks │
+│ • Network OK │     │ • Active User│     │ • Firewall   │
+└──────┬───────┘     └──────┬───────┘     └──────┬───────┘
+       │                    │                    │
+       └────────────────────┼────────────────────┘
+                            │
+       ┌────────────────────┴────────────────────┐
+       ▼                                         ▼
+┌──────────────┐                          ┌──────────────┐
+│ Alert Engine │                          │  Reporting   │
+├──────────────┤                          ├──────────────┤
+│ • Email Mail │                          │ • Text Logs  │
+│ • Local Logs │                          │ • JSON Tele. │
+└──────────────┘                          └──────────────┘
+```
+
+---
+
+## 🚀 Quick Start & Installation
+
+### Option 1: Automated System Installation (Recommended)
+
+Clone the repository and run the automated installer with `sudo`:
 
 ```bash
-git clone https://github.com/ArifAli8866/CyberSecMon.git
-cd CyberSecMon
+git clone https://github.com/ArifAli8866/linux-soc-monitor.git
+cd linux-soc-monitor
 chmod +x install.sh
-./install.sh
+sudo ./install.sh
 ```
 
-The installer sets up all required tools, dependencies, and configurations automatically.
+The installer:
+1. Detects your distribution and installs dependencies (`mailutils`, `iputils-ping`, `procps`, etc.).
+2. Installs the binary to `/usr/local/bin/cybersecmon`.
+3. Sets up system configuration at `/etc/cybersec_monitor.conf`.
+4. Installs the systemd unit `cybersecmon.service`.
 
----
+### Option 2: Portable / Standalone Execution
 
-## Quick Start
-
-Run the main menu:
+You can run the script directly without installing globally:
 
 ```bash
-sudo ./cybersecmon.sh
-```
-
-* Choose the monitoring type: CPU, RAM, Disk, Network, or Full System.
-* Set thresholds for alerts.
-* Configure your email to receive notifications.
-* Watch the live animated status dashboard.
-
----
-
-## How It Works (Diagram)
-```
-┌───────────────────────┐
-│       CyberSecMon      │
-│   Menu-Driven CLI      │
-├─────────────┬─────────┤
-│ CPU Monitor │ RAM Monitor
-│ Disk Monitor│ Network Monitor
-│ Threshold   │ Email Alerts
-└─────────────┴─────────┘
-         │
-         ▼
-     Real-Time Alerts
+git clone https://github.com/ArifAli8866/linux-soc-monitor.git
+cd linux-soc-monitor
+chmod +x health_monitor.sh
+./health_monitor.sh
 ```
 
 ---
 
-## Screenshots
+## 💻 Usage & CLI Options
 
-<p align="center">
-  <img src="Blue and White Gradient 3D We Are Hiring LinkedIn Post (1).png" alt="Feature 1" width="300">
-  <img src="Screenshot_2026-01-29_22-55-29.png" alt="Feature 2" width="300">
-  <img src="Screenshot_2026-01-29_22-56-01.png" alt="Feature 3" width="300">
-</p>
+### Interactive Menu Mode
+Simply execute without arguments to launch the colorful dashboard:
+```bash
+cybersecmon
+```
 
-*(Replace with your own screenshots or live dashboard captures)*
+```
+╔════════════════════════════════════════════════════╗
+║   CYBERSEC LINUX HEALTH & THREAT MONITOR            ║
+║           Created by Arif Ali                       ║
+╚════════════════════════════════════════════════════╝
 
----
+1)  CPU Check
+2)  Memory Check
+3)  Disk Check
+4)  Internet Status
+5)  Login Attack Scan
+6)  Top Processes
+7)  Open Ports & Sockets Audit
+8)  User Accounts & Sessions Audit
+9)  System Integrity & Services Audit
+10) Full Security Scan
+11) Configure Settings & Thresholds
+12) Exit
+```
 
-## Configuration
-
-1. Open `config.sh` to set your email and thresholds.
-2. CPU, RAM, Disk, and Network limits can be customized.
-3. Email alerts require `mailutils` or `sendmail`.
+### CLI Command-Line Flags
 
 ```bash
-EMAIL="your.email@example.com"
-CPU_THRESHOLD=85
-RAM_THRESHOLD=90
-DISK_THRESHOLD=80
-NETWORK_THRESHOLD=1000  # MB/s
+# Display help and usage
+cybersecmon --help
+
+# Display version
+cybersecmon --version
+
+# Run single non-interactive scan (ideal for crontabs)
+cybersecmon --scan
+
+# Output structured JSON telemetry (ideal for SOC pipelines)
+cybersecmon --json
+
+# Run continuously as daemon with 60-second intervals
+cybersecmon --daemon 60
+
+# Specify custom configuration file
+cybersecmon --config /path/to/custom.conf
+
+# Skip automatic dependency verification
+cybersecmon --no-install --scan
 ```
 
 ---
 
-## License
+## 📊 SIEM / JSON Telemetry Sample
 
-This project is licensed under the **MIT License** — see [LICENSE](LICENSE) for details.
+Running `cybersecmon --json` produces structured JSON output:
+
+```json
+{
+  "timestamp": "2026-10-13 23:50:00",
+  "system": {
+    "hostname": "linux-server",
+    "kernel": "6.18.7-generic"
+  },
+  "metrics": {
+    "cpu_percent": 18.4,
+    "memory_percent": 62,
+    "disk_percent": 45,
+    "internet_status": "connected",
+    "failed_logins": 0,
+    "listening_ports_count": 14,
+    "failed_systemd_units": 0
+  },
+  "thresholds": {
+    "cpu_limit": 80,
+    "memory_limit": 80,
+    "disk_limit": 85,
+    "login_fail_limit": 5
+  }
+}
+```
 
 ---
 
-## Follow & Support
+## ⚙️ Configuration
+
+Configurations are stored in `~/.config/cybersec_monitor/cybersec_monitor.conf` (user mode) or `/etc/cybersec_monitor.conf` (system mode).
+
+```ini
+# CyberSec Linux Health & Threat Monitor Config
+EMAIL_ALERT="security-team@example.com"
+CPU_LIMIT=80
+MEM_LIMIT=80
+DISK_LIMIT=85
+LOGIN_FAIL_LIMIT=5
+REPORT_DIR="reports"
+LOG_FILE="security.log"
+```
+
+You can update configurations directly via **Option 11** in the menu or by using a custom config via `--config`.
+
+---
+
+## 🔄 Systemd Background Service
+
+Run `CyberSecMon` as a background persistent daemon managed by systemd:
+
+```bash
+# Enable and start the service
+sudo systemctl enable --now cybersecmon
+
+# Check service status
+sudo systemctl status cybersecmon
+
+# View live service logs
+sudo journalctl -u cybersecmon -f
+```
+
+---
+
+## 🧪 Automated Testing & CI
+
+A comprehensive test suite is included in `tests/test_monitor.sh`. To run tests locally:
+
+```bash
+./tests/test_monitor.sh
+```
+
+GitHub Actions automatically runs syntax verification and unit tests on every commit and pull request.
+
+---
+
+## 🖼️ Screenshots
 
 <p align="center">
-  <a href="https://linkedin.com/in/arif-ali-23a38032a"><img src="https://img.shields.io/badge/LinkedIn-Follow-blue?style=for-the-badge&logo=linkedin&logoColor=white" alt="LinkedIn"></a>
-  <a href="https://github.com/ArifAli8866"><img src="https://img.shields.io/badge/GitHub-Follow-black?style=for-the-badge&logo=github&logoColor=white" alt="GitHub"></a>
+  <img src="docs/images/screenshot_menu.png" alt="Main Interactive Menu" width="450">
+  <img src="docs/images/screenshot_scan.png" alt="Security Scan Execution" width="450">
 </p>
 
+---
+
+## 🗑️ Uninstallation
+
+To cleanly remove `CyberSecMon` and its systemd service:
+
+```bash
+sudo ./uninstall.sh
+```
+
+---
+
+## 📄 License
+
+This project is open-source and distributed under the [MIT License](LICENSE).
+
+---
+
+## 👤 Author & Support
+
+Developed by **Arif Ali**  
+- **GitHub**: [@ArifAli8866](https://github.com/ArifAli8866)  
+- **LinkedIn**: [Arif Ali](https://linkedin.com/in/arif-ali-23a38032a)  
+- **Repository**: [linux-soc-monitor](https://github.com/ArifAli8866/linux-soc-monitor)
