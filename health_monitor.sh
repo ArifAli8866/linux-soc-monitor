@@ -259,6 +259,49 @@ top_processes() {
   ps -eo pid,comm,%cpu --sort=-%cpu | head -6 >> "$REPORT_FILE"
 }
 
+# ---------------- OPEN PORTS & SOCKETS ----------------
+network_ports_check() {
+  refresh_timestamps
+  echo -e "${CYAN}--- Active Listening Ports & Sockets ---${RESET}"
+  echo "===== LISTENING PORTS ($DATE $TIME) =====" >> "$REPORT_FILE"
+
+  local port_cmd=""
+  if command -v ss &>/dev/null; then
+    port_cmd="ss -tuln"
+  elif command -v netstat &>/dev/null; then
+    port_cmd="netstat -tuln"
+  fi
+
+  if [ -z "$port_cmd" ]; then
+    echo -e "${YELLOW}Warning: Neither 'ss' nor 'netstat' is available.${RESET}"
+    return
+  fi
+
+  local total_ports
+  total_ports=$($port_cmd | awk 'NR>1 {print $1, $5}' | grep -c -v '^$' || true)
+
+  echo -e "${GREEN}Total Listening Services: ${total_ports}${RESET}"
+  echo "Total Listening Services: ${total_ports}" >> "$REPORT_FILE"
+
+  $port_cmd | head -n 15
+  $port_cmd >> "$REPORT_FILE"
+
+  local risky_patterns="(:21|:23|:3306|:5432|:6379|:27017)"
+  local exposed_risks
+  exposed_risks=$($port_cmd | grep -E "(0\.0\.0\.0|\*|\[::\])$risky_patterns" || true)
+
+  if [ -n "$exposed_risks" ]; then
+    echo -e "\n${RED}⚠ WARNING: Sensitive or unencrypted ports exposed publicly!${RESET}"
+    echo "$exposed_risks" | while read -r line; do
+      echo -e "${RED}  -> $line${RESET}"
+    done
+    log_event "Alert: Sensitive service port exposed on public interface"
+    send_alert "Security Alert: Sensitive service listening on public interface!"
+  else
+    echo -e "${GREEN}✔ No sensitive database or cleartext ports exposed on wildcard IP.${RESET}"
+  fi
+}
+
 # ---------------- FULL SCAN ----------------
 full_scan() {
   refresh_timestamps
@@ -269,6 +312,7 @@ full_scan() {
   internet_check
   login_monitor
   top_processes
+  network_ports_check
 
   echo -e "\n${GREEN}${BOLD}✔ Full security scan completed${RESET}"
   echo -e "${CYAN}Report saved: $REPORT_FILE${RESET}"
@@ -277,15 +321,16 @@ full_scan() {
 # ---------------- MENU ----------------
 menu() {
 echo -e "${BOLD}"
-echo "1) CPU Check"
-echo "2) Memory Check"
-echo "3) Disk Check"
-echo "4) Internet Status"
-echo "5) Login Attack Scan"
-echo "6) Top Processes"
-echo "7) Full Security Scan"
-echo "8) Configure Settings & Thresholds"
-echo "9) Exit"
+echo "1)  CPU Check"
+echo "2)  Memory Check"
+echo "3)  Disk Check"
+echo "4)  Internet Status"
+echo "5)  Login Attack Scan"
+echo "6)  Top Processes"
+echo "7)  Open Ports & Sockets Audit"
+echo "8)  Full Security Scan"
+echo "9)  Configure Settings & Thresholds"
+echo "10) Exit"
 echo -e "${RESET}"
 }
 
@@ -297,7 +342,7 @@ loading
 while true; do
   banner
   menu
-  read -p "Choose option [1-9]: " ch
+  read -p "Choose option [1-10]: " ch
 
   case $ch in
     1) cpu_check ;;
@@ -306,9 +351,10 @@ while true; do
     4) internet_check ;;
     5) login_monitor ;;
     6) top_processes ;;
-    7) full_scan ;;
-    8) configure_settings ;;
-    9) echo -e "${RED}Exiting CyberSec Monitor...${RESET}"; exit 0 ;;
+    7) network_ports_check ;;
+    8) full_scan ;;
+    9) configure_settings ;;
+    10) echo -e "${RED}Exiting CyberSec Monitor...${RESET}"; exit 0 ;;
     *) echo -e "${RED}Invalid option${RESET}" ;;
   esac
 
