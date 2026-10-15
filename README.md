@@ -38,7 +38,7 @@ Whether run interactively as a menu-driven TUI, automated through `cron` or `sys
 
 ## 📐 Architecture & Workflow
 
-```
+`
 ┌────────────────────────────────────────────────────────┐
 │      CyberSec Linux Health & Threat Monitor (CLI/TUI)  │
 └───────────────────────────┬────────────────────────────┘
@@ -64,9 +64,7 @@ Whether run interactively as a menu-driven TUI, automated through `cron` or `sys
 │ • Email Mail │                          │ • Text Logs  │
 │ • Local Logs │                          │ • JSON Tele. │
 └──────────────┘                          └──────────────┘
-```
 
----
 
 ## 🚀 Quick Start & Installation
 
@@ -74,13 +72,12 @@ Whether run interactively as a menu-driven TUI, automated through `cron` or `sys
 
 Clone the repository and run the automated installer with `sudo`:
 
-```bash
+bash
 git clone https://github.com/ArifAli8866/linux-soc-monitor.git
 cd linux-soc-monitor
 chmod +x install.sh
 sudo ./install.sh
-```
-
+`
 The installer:
 1. Detects your distribution and installs dependencies (`mailutils`, `iputils-ping`, `procps`, etc.).
 2. Installs the binary to `/usr/local/bin/cybersecmon`.
