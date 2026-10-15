@@ -2,6 +2,7 @@
 # ==========================================================
 #  CyberSec Linux Health & Threat Monitor - Uninstaller
 #  Author : Arif Ali
+#  this is a basic project no production level project so consider it as local use
 # ==========================================================
 
 set -e
